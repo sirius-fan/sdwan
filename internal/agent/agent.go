@@ -12,11 +12,13 @@ import (
 )
 
 type Config struct {
-	Controller string   // http base, e.g. http://127.0.0.1:8080
+	Controller string // http base, e.g. http://127.0.0.1:8080
 	Hostname   string
 	OS         string
 	Version    string
 	Endpoints  []string // public candidates
+	Iface      string   // wireguard interface name, e.g. wg0
+	ListenPort int      // wg listen port, 0 for kernel-chosen
 }
 
 type Agent struct {
@@ -76,3 +78,14 @@ func (a *Agent) FetchPeers() ([]common.Node, error) {
 
 func (a *Agent) PrivateKey() string { return a.priv }
 func (a *Agent) Self() *common.Node { return a.self }
+
+// ApplyWireGuard applies WireGuard device and peer configuration. Safe to call repeatedly.
+func (a *Agent) ApplyWireGuard(peers []common.Node) error {
+	if a.self == nil || a.priv == "" {
+		return errors.New("not registered")
+	}
+	if a.cfg.Iface == "" {
+		a.cfg.Iface = "wg0"
+	}
+	return applyWG(a.cfg.Iface, a.cfg.ListenPort, a.Self(), a.priv, peers)
+}
