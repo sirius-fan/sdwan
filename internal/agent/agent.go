@@ -22,10 +22,11 @@ type Config struct {
 }
 
 type Agent struct {
-	cfg    Config
-	self   *common.Node
-	priv   string
-	client *http.Client
+	cfg     Config
+	self    *common.Node
+	priv    string
+	client  *http.Client
+	netCIDR string
 }
 
 func New(cfg Config) *Agent {
@@ -34,10 +35,11 @@ func New(cfg Config) *Agent {
 
 func (a *Agent) Register() error {
 	body := common.RegisterRequest{
-		Hostname:  a.cfg.Hostname,
-		OS:        a.cfg.OS,
-		Version:   a.cfg.Version,
-		Endpoints: a.cfg.Endpoints,
+		Hostname:   a.cfg.Hostname,
+		OS:         a.cfg.OS,
+		Version:    a.cfg.Version,
+		Endpoints:  a.cfg.Endpoints,
+		ListenPort: a.cfg.ListenPort,
 	}
 	b, _ := json.Marshal(body)
 	resp, err := a.client.Post(a.cfg.Controller+"/api/register", "application/json", bytes.NewReader(b))
@@ -54,6 +56,7 @@ func (a *Agent) Register() error {
 	}
 	a.self = &r.Node
 	a.priv = r.PrivKey
+	a.netCIDR = r.NetworkCIDR
 	return nil
 }
 
@@ -87,5 +90,36 @@ func (a *Agent) ApplyWireGuard(peers []common.Node) error {
 	if a.cfg.Iface == "" {
 		a.cfg.Iface = "wg0"
 	}
+	if err := ensureWGDevice(a.cfg.Iface); err != nil {
+		return fmt.Errorf("ensure wg dev: %w", err)
+	}
+	if err := ensureWGAddrRoute(a.cfg.Iface, a.Self().TunnelIP, a.netCIDR); err != nil {
+		return fmt.Errorf("ensure addr/route: %w", err)
+	}
 	return applyWG(a.cfg.Iface, a.cfg.ListenPort, a.Self(), a.priv, peers)
+}
+
+// Announce endpoints to controller
+func (a *Agent) Announce() error {
+	if a.self == nil {
+		return errors.New("not registered")
+	}
+	eps := gatherLocalEndpoints(a.cfg.ListenPort)
+	body := common.AnnounceRequest{
+		NodeID:     a.self.ID,
+		Endpoints:  eps,
+		ListenPort: a.cfg.ListenPort,
+	}
+	b, _ := json.Marshal(body)
+	req, _ := http.NewRequest(http.MethodPost, a.cfg.Controller+"/api/announce", bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("announce status %d", resp.StatusCode)
+	}
+	return nil
 }

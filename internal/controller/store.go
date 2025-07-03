@@ -75,10 +75,40 @@ func (s *Store) UpsertNode(n common.Node) (common.Node, error) {
 		}
 		n.TunnelIP = ip
 	}
+	// choose a preferred endpoint when available (simple: pick first valid ip:port)
+	if n.Endpoint == "" {
+		for _, e := range n.Endpoints {
+			if _, _, err := net.SplitHostPort(e); err == nil {
+				n.Endpoint = e
+				break
+			}
+		}
+	}
 	n.LastSeen = time.Now()
 	s.nodes[n.ID] = n
 	s.byIP[n.TunnelIP] = n.ID
 	return n, nil
+}
+
+// UpdateEndpoints updates a node's endpoints and selects a preferred endpoint.
+func (s *Store) UpdateEndpoints(nodeID string, eps []string, listenPort int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n, ok := s.nodes[nodeID]
+	if !ok {
+		return errors.New("node not found")
+	}
+	n.Endpoints = eps
+	n.Endpoint = ""
+	for _, e := range eps {
+		if _, _, err := net.SplitHostPort(e); err == nil {
+			n.Endpoint = e
+			break
+		}
+	}
+	// Optionally, if no explicit endpoints but we know listen port, we could infer from recent request's remote addr (not available here).
+	s.nodes[nodeID] = n
+	return nil
 }
 
 func (s *Store) allocateIPNoLock() (string, error) {

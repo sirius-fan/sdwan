@@ -19,29 +19,39 @@ type Node struct {
 	PublicKey string    `json:"publicKey"`
 	TunnelIP  string    `json:"tunnelIp"`
 	Endpoints []string  `json:"endpoints"`
+	Endpoint  string    `json:"endpoint,omitempty"`
 	Relays    []string  `json:"relays"`
 	LastSeen  time.Time `json:"lastSeen"`
 }
 
 // RegisterRequest is sent by agent to controller to join.
 type RegisterRequest struct {
-	Hostname  string   `json:"hostname"`
-	OS        string   `json:"os"`
-	Version   string   `json:"version"`
-	Endpoints []string `json:"endpoints"` // candidate public endpoints (ip:port)
+	Hostname   string   `json:"hostname"`
+	OS         string   `json:"os"`
+	Version    string   `json:"version"`
+	Endpoints  []string `json:"endpoints"` // candidate public endpoints (ip:port)
+	ListenPort int      `json:"listenPort,omitempty"`
 }
 
 // RegisterResponse contains allocated identity and peers.
 type RegisterResponse struct {
-	Node     Node    `json:"node"`
-	Peers    []Node  `json:"peers"`
-	PrivKey  string  `json:"privKey"` // base64-encoded or wg key string
-	RelayUDP *string `json:"relayUdp,omitempty"`
+	Node        Node    `json:"node"`
+	Peers       []Node  `json:"peers"`
+	PrivKey     string  `json:"privKey"` // base64-encoded or wg key string
+	RelayUDP    *string `json:"relayUdp,omitempty"`
+	NetworkCIDR string  `json:"networkCidr"`
 }
 
 // PeerUpdate periodically sent by controller to agents.
 type PeerUpdate struct {
 	Peers []Node `json:"peers"`
+}
+
+// AnnounceRequest used by agent to update endpoints and listen port.
+type AnnounceRequest struct {
+	NodeID     string   `json:"nodeId"`
+	Endpoints  []string `json:"endpoints"`
+	ListenPort int      `json:"listenPort,omitempty"`
 }
 
 // KeyPair generates a WireGuard keypair as strings.

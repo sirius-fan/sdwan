@@ -15,6 +15,7 @@ func main() {
 		hostname   = flag.String("hostname", "node", "hostname")
 		iface      = flag.String("iface", "wg0", "wireguard interface name")
 		listenPort = flag.Int("listen", 51820, "wireguard listen port")
+		endpoint   = flag.String("endpoint", "", "public endpoint host:port to advertise")
 	)
 	flag.Parse()
 
@@ -23,7 +24,7 @@ func main() {
 		Hostname:   *hostname,
 		OS:         runtime.GOOS,
 		Version:    "dev",
-		Endpoints:  nil,
+		Endpoints:  condSlice(*endpoint),
 		Iface:      *iface,
 		ListenPort: *listenPort,
 	})
@@ -33,6 +34,9 @@ func main() {
 	log.Printf("registered: id=%s ip=%s privKey(len)=%d", a.Self().ID, a.Self().TunnelIP, len(a.PrivateKey()))
 	if err := a.ApplyWireGuard(nil); err != nil {
 		log.Printf("apply wg (initial): %v", err)
+	}
+	if err := a.Announce(); err != nil {
+		log.Printf("announce: %v", err)
 	}
 
 	for {
@@ -45,6 +49,16 @@ func main() {
 				log.Printf("apply wg: %v", err)
 			}
 		}
+		if err := a.Announce(); err != nil {
+			log.Printf("announce: %v", err)
+		}
 		time.Sleep(15 * time.Second)
 	}
+}
+
+func condSlice(s string) []string {
+	if s == "" {
+		return nil
+	}
+	return []string{s}
 }
