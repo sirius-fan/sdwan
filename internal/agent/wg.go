@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"os/exec"
@@ -70,14 +71,14 @@ func intPtr(v int) *int { return &v }
 // ensureWGDevice creates the interface if not present and sets it up.
 func ensureWGDevice(iface string) error {
 	// Check if link exists: ip link show dev iface
-	if err := exec.Command("ip", "link", "show", "dev", iface).Run(); err != nil {
+	if err := run(ipCmd(), "link", "show", "dev", iface); err != nil {
 		// Try to add
-		if err := exec.Command("ip", "link", "add", iface, "type", "wireguard").Run(); err != nil {
+		if err := run(ipCmd(), "link", "add", iface, "type", "wireguard"); err != nil {
 			return fmt.Errorf("add wg dev: %w", err)
 		}
 	}
 	// Set up
-	if err := exec.Command("ip", "link", "set", "dev", iface, "up").Run(); err != nil {
+	if err := run(ipCmd(), "link", "set", "dev", iface, "up"); err != nil {
 		return fmt.Errorf("link up: %w", err)
 	}
 	return nil
@@ -87,17 +88,17 @@ func ensureWGDevice(iface string) error {
 func ensureWGAddrRoute(iface, selfIP, networkCIDR string) error {
 	if selfIP != "" {
 		// Remove existing /32s for idempotency (best-effort)
-		_ = exec.Command("ip", "addr", "flush", "dev", iface).Run()
+		_ = run(ipCmd(), "addr", "flush", "dev", iface)
 		// Assign /32
-		if err := exec.Command("ip", "addr", "add", fmt.Sprintf("%s/32", selfIP), "dev", iface).Run(); err != nil {
+		if err := run(ipCmd(), "addr", "add", fmt.Sprintf("%s/32", selfIP), "dev", iface); err != nil {
 			return fmt.Errorf("addr add: %w", err)
 		}
 	}
 	if networkCIDR != "" {
 		// Ensure route exists; if already present, ignore
-		out, _ := exec.Command("ip", "route", "show", "dev", iface).Output()
+		out, _ := runOut(ipCmd(), "route", "show", "dev", iface)
 		if !strings.Contains(string(out), networkCIDR) {
-			_ = exec.Command("ip", "route", "add", networkCIDR, "dev", iface).Run()
+			_ = run(ipCmd(), "route", "add", networkCIDR, "dev", iface)
 		}
 	}
 	return nil
@@ -141,4 +142,44 @@ func gatherLocalEndpoints(listenPort int) []string {
 		out = append(out, e)
 	}
 	return out
+}
+
+// ipCmd tries to find an absolute path to `ip` for environments where /sbin is not in PATH.
+func ipCmd() string {
+	if p, err := exec.LookPath("ip"); err == nil {
+		return p
+	}
+	candidates := []string{"/usr/sbin/ip", "/sbin/ip", "/usr/bin/ip"}
+	for _, c := range candidates {
+		if _, err := exec.LookPath(c); err == nil {
+			return c
+		}
+	}
+	// fallback to "ip" and let the error surface if truly missing
+	return "ip"
+}
+
+func run(name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+	if err := cmd.Run(); err != nil {
+		if b := buf.String(); b != "" {
+			return fmt.Errorf("%v: %s", err, strings.TrimSpace(b))
+		}
+		return err
+	}
+	return nil
+}
+
+func runOut(name string, args ...string) ([]byte, error) {
+	cmd := exec.Command(name, args...)
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+	if err := cmd.Run(); err != nil {
+		return buf.Bytes(), err
+	}
+	return buf.Bytes(), nil
 }

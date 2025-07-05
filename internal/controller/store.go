@@ -54,7 +54,13 @@ func (s *Store) allocateIP() (string, error) {
 func incIP(base net.IP, off uint32) net.IP {
 	b := make(net.IP, len(base))
 	copy(b, base)
-	// assume IPv4 for starter
+	if v4 := b.To4(); v4 != nil {
+		bi := uint32(v4[0])<<24 | uint32(v4[1])<<16 | uint32(v4[2])<<8 | uint32(v4[3])
+		bi += off
+		out := net.IPv4(byte(bi>>24), byte(bi>>16), byte(bi>>8), byte(bi))
+		return out
+	}
+	// IPv6 (very simple increment within /64+/96 not guaranteed): operate on last 4 bytes
 	bi := uint32(b[12])<<24 | uint32(b[13])<<16 | uint32(b[14])<<8 | uint32(b[15])
 	bi += off
 	b[12] = byte(bi >> 24)
