@@ -8,10 +8,28 @@
 
 当前状态：
 - 当前已经实现基本逻辑,短期先不搞了, 需求动力不足, 我这四五个机器,可以手写路由规则了 😂
-- 使用 wgctrl 生成密钥；命令 WireGuard 设备
+- 使用 wgctrl 生成密钥；通过IP命令配置 WireGuard 设备
 - 未实现控制面加密传输
 - 未实现 NAT 穿透/打洞，仅骨架
 - 中继路由未实现，仅 echo
+
+
+创建控制面节点
+<!-- img -->
+![Screenshot.png](https://github.com/sirius-fan/sdwan/blob/master/pic/Screenshot_2025-09-07_23%3A25%3A21.png)
+
+节点1
+![Screenshot-1.png](https://github.com/sirius-fan/sdwan/blob/master/pic/Screenshot_2025-09-07_23%3A25%3A45.png)
+
+节点2
+![Screenshot-2.png](https://github.com/sirius-fan/sdwan/blob/master/pic/Screenshot_2025-09-07_23%3A24%3A07.png)
+
+ping
+![Screenshot-3.png](https://github.com/sirius-fan/sdwan/blob/master/pic/Screenshot_2025-09-07_23%3A25%3A00.png)
+
+http server
+![Screenshot-4.png](https://github.com/sirius-fan/sdwan/blob/master/pic/Screenshot_2025-09-07_23%3A26%3A26.png)
+
 
 
 # sdwan (WIP)
